@@ -1,0 +1,221 @@
+# Surveillance de site web
+
+Petit script Bash permettant de surveiller la disponibilité d'un site web et de prévenir l'utilisateur lorsque celui-ci revient en ligne.
+
+## Fonctionnement
+
+Le script vérifie régulièrement l'état de `https://novelfrance.fr`.
+
+Par défaut, il effectue une vérification toutes les **60 secondes**.
+
+Pour chaque vérification, il affiche l'heure et le code HTTP obtenu :
+
+```text
+[20:30:15] HTTP 522
+[20:31:15] HTTP 522
+[20:32:15] HTTP 200
+```
+
+Le site est considéré comme disponible lorsque le code HTTP commence par :
+
+* `2xx` : succès
+* `3xx` : redirection
+
+Lorsqu'un de ces codes est obtenu, le script :
+
+1. affiche un message dans le terminal ;
+2. envoie un e-mail ;
+3. joue trois signaux sonores avec `printf '\a'` ;
+4. affiche une notification système ;
+5. arrête le script.
+
+## Prérequis
+
+Le script nécessite :
+
+* Bash
+* `curl`
+* `mail`
+* `notify-send`
+
+Sur Ubuntu, les commandes nécessaires peuvent être installées avec :
+
+```bash
+sudo apt install curl mailutils libnotify-bin
+```
+
+La commande `mail` doit également être correctement configurée pour pouvoir envoyer des e-mails.
+
+## Installation
+
+Créer le fichier :
+
+```bash
+nano surveille-site.sh
+```
+
+Copier le script dans le fichier, puis rendre le fichier exécutable :
+
+```bash
+chmod +x surveille-site.sh
+```
+
+Lancer la surveillance :
+
+```bash
+./surveille-site.sh
+```
+
+## Configuration
+
+Les paramètres principaux sont définis au début du script :
+
+```bash
+MAIL="augustin.schneller@epita.fr"
+URL="https://novelfrance.fr"
+INTERVAL=60
+```
+
+### Adresse e-mail
+
+Modifier `MAIL` pour changer le destinataire :
+
+```bash
+MAIL="exemple@example.com"
+```
+
+Pour désactiver l'envoi d'e-mail :
+
+```bash
+MAIL=""
+```
+
+### Site surveillé
+
+Modifier `URL` pour surveiller un autre site :
+
+```bash
+URL="https://example.com"
+```
+
+### Intervalle
+
+`INTERVAL` correspond au nombre de secondes entre deux vérifications.
+
+Par exemple, pour vérifier toutes les 30 secondes :
+
+```bash
+INTERVAL=30
+```
+
+## Requête HTTP
+
+Le script utilise :
+
+```bash
+curl -4 -L -s -o /dev/null -w "%{http_code}" \
+    --connect-timeout 10 \
+    --max-time 20 \
+    "$URL"
+```
+
+Les options utilisées sont :
+
+| Option                 | Fonction                                     |
+| ---------------------- | -------------------------------------------- |
+| `-4`                   | Force l'utilisation d'IPv4                   |
+| `-L`                   | Suit les redirections HTTP                   |
+| `-s`                   | Désactive l'affichage de la sortie de `curl` |
+| `-o /dev/null`         | Ignore le contenu de la page                 |
+| `-w "%{http_code}"`    | Affiche uniquement le code HTTP              |
+| `--connect-timeout 10` | Limite la connexion à 10 secondes            |
+| `--max-time 20`        | Limite la requête complète à 20 secondes     |
+
+## Codes HTTP
+
+Le script affiche le code reçu.
+
+Exemples :
+
+```text
+HTTP 200
+```
+
+Le site est considéré comme revenu.
+
+```text
+HTTP 301
+```
+
+Le site est également considéré comme revenu.
+
+```text
+HTTP 404
+```
+
+Le site n'est pas considéré comme revenu.
+
+```text
+HTTP 500
+```
+
+Le site n'est pas considéré comme revenu.
+
+```text
+HTTP 522
+```
+
+Le site n'est pas considéré comme revenu.
+
+Lorsque `curl` ne parvient pas à obtenir de code HTTP, il peut retourner :
+
+```text
+HTTP 000
+```
+
+## Arrêt du script
+
+Le script fonctionne en continu grâce à :
+
+```bash
+while true; do
+```
+
+Pour arrêter manuellement la surveillance :
+
+```text
+Ctrl+C
+```
+
+Lorsque le site revient en ligne, le script s'arrête automatiquement avec :
+
+```bash
+exit 0
+```
+
+## Exemple
+
+Lancement :
+
+```text
+Surveillance de https://novelfrance.fr...
+Vérification toutes les 60 secondes.
+Appuie sur Ctrl+C pour arrêter.
+```
+
+Pendant une panne :
+
+```text
+[20:40:01] HTTP 522
+[20:41:01] HTTP 522
+[20:42:01] HTTP 522
+```
+
+Lorsque le site revient :
+
+```text
+[20:43:01] HTTP 200
+https://novelfrance.fr est revenu ! HTTP 200
+```
+
+Le script envoie alors l'e-mail, joue les signaux sonores, affiche la notification et s'arrête.
